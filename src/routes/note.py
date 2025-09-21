@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from src.models.note import Note, db
+from datetime import datetime, date, time
 
 note_bp = Blueprint('note', __name__)
 
@@ -17,7 +18,28 @@ def create_note():
         if not data or 'title' not in data or 'content' not in data:
             return jsonify({'error': 'Title and content are required'}), 400
         
-        note = Note(title=data['title'], content=data['content'])
+        # 處理日期和時間字符串
+        event_date = None
+        if data.get('event_date'):
+            try:
+                event_date = datetime.strptime(data['event_date'], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        event_time = None
+        if data.get('event_time'):
+            try:
+                event_time = datetime.strptime(data['event_time'], '%H:%M').time()
+            except ValueError:
+                pass
+
+        note = Note(
+            title=data['title'],
+            content=data['content'],
+            tags=data.get('tags'),
+            event_date=event_date,
+            event_time=event_time
+        )
         db.session.add(note)
         db.session.commit()
         return jsonify(note.to_dict()), 201
@@ -43,6 +65,22 @@ def update_note(note_id):
         
         note.title = data.get('title', note.title)
         note.content = data.get('content', note.content)
+        note.tags = data.get('tags', note.tags)
+
+        # 處理日期
+        if 'event_date' in data:
+            try:
+                note.event_date = datetime.strptime(data['event_date'], '%Y-%m-%d').date() if data['event_date'] else None
+            except ValueError:
+                note.event_date = None
+
+        # 處理時間
+        if 'event_time' in data:
+            try:
+                note.event_time = datetime.strptime(data['event_time'], '%H:%M').time() if data['event_time'] else None
+            except ValueError:
+                note.event_time = None
+
         db.session.commit()
         return jsonify(note.to_dict())
     except Exception as e:
