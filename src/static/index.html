@@ -483,15 +483,14 @@
 
             renderNotesList() {
                 const notesList = document.getElementById('notesList');
-                
                 if (this.notes.length === 0) {
                     notesList.innerHTML = '<div class="empty-state"><p>No notes yet. Create your first note!</p></div>';
                     return;
                 }
-            
                 notesList.innerHTML = this.notes.map(note => `
-                    <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
+                    <div class="note-item${this.currentNote && this.currentNote.id === note.id ? ' active' : ''}"
+                         data-note-id="${note.id}"
+                         draggable="true">
                         <div class="note-header">
                             <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                             <div class="note-meta">${this.formatDate(note.updated_at)}</div>
@@ -507,6 +506,58 @@
                         </div>
                     </div>
                 `).join('');
+
+                // 加入拖曳排序事件
+                this.enableNoteDragAndDrop();
+            }
+
+            enableNoteDragAndDrop() {
+                const notesList = document.getElementById('notesList');
+                let dragSrcEl = null;
+                Array.from(notesList.children).forEach(item => {
+                    item.addEventListener('dragstart', function(e) {
+                        dragSrcEl = this;
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/html', this.outerHTML);
+                        this.classList.add('dragging');
+                    });
+                    item.addEventListener('dragover', function(e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+                    item.addEventListener('dragenter', function() {
+                        this.classList.add('over');
+                    });
+                    item.addEventListener('dragleave', function() {
+                        this.classList.remove('over');
+                    });
+                    item.addEventListener('drop', (e) => {
+                        e.stopPropagation();
+                        if (dragSrcEl !== item) {
+                            // 交換 DOM
+                            const srcIndex = Array.from(notesList.children).indexOf(dragSrcEl);
+                            const tgtIndex = Array.from(notesList.children).indexOf(item);
+                            if (srcIndex > -1 && tgtIndex > -1) {
+                                // 交換 notes 陣列
+                                const temp = this.notes[srcIndex];
+                                this.notes[srcIndex] = this.notes[tgtIndex];
+                                this.notes[tgtIndex] = temp;
+                                this.renderNotesList();
+                                    // ...原本交換 notes 陣列與 renderNotesList...
+                                this.updateNoteOrderOnServer();
+                            }
+                        }
+                        return false;
+                    });
+                    item.addEventListener('dragend', function() {
+                        this.classList.remove('dragging');
+                        Array.from(notesList.children).forEach(i => i.classList.remove('over'));
+                    });
+                    item.addEventListener('click', function(e) {
+                        if (this.classList.contains('dragging')) return; // 正在拖曳時不觸發編輯
+                        noteTaker.selectNote(Number(this.dataset.noteId));
+                    });
+                });
             }
 
             async selectNote(noteId) {
@@ -725,6 +776,23 @@
                 const eventDate = new Date(date);
                 const formattedDate = eventDate.toLocaleDateString();
                 return `<span class="event-date">📅 ${formattedDate}${time ? ` ⏰ ${time}` : ''}</span>`;
+            }
+
+            async updateNoteOrderOnServer() {
+                // 取得目前排序後的 id 陣列
+                const noteIds = this.notes.map(note => note.id);
+                try {
+                    const response = await fetch('/api/notes/order', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ note_ids: noteIds })
+                    });
+                    if (!response.ok) throw new Error('Failed to update order');
+                    // 可選：顯示成功訊息
+                    this.showMessage('順序已同步到伺服器', 'success');
+                } catch (error) {
+                    this.showMessage(`同步順序失敗: ${error.message}`, 'error');
+                }
             }
         }
 
