@@ -6,9 +6,27 @@ note_bp = Blueprint('note', __name__)
 
 @note_bp.route('/notes', methods=['GET'])
 def get_notes():
-    """Get all notes, ordered by most recently updated"""
-    notes = Note.query.order_by(Note.updated_at.desc()).all()
+    """Get all notes, ordered by order then updated_at"""
+    notes = Note.query.order_by(Note.order.asc(), Note.updated_at.desc()).all()
     return jsonify([note.to_dict() for note in notes])
+# 批次更新筆記順序
+@note_bp.route('/notes/order', methods=['PUT'])
+def update_notes_order():
+    """Update notes order by a list of note ids"""
+    try:
+        data = request.json
+        note_ids = data.get('note_ids')
+        if not note_ids or not isinstance(note_ids, list):
+            return jsonify({'error': 'note_ids (list) required'}), 400
+        for idx, note_id in enumerate(note_ids):
+            note = Note.query.get(note_id)
+            if note:
+                note.order = idx
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @note_bp.route('/notes', methods=['POST'])
 def create_note():

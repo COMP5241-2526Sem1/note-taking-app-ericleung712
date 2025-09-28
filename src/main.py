@@ -49,4 +49,13 @@ def serve(path):
 
 
 if __name__ == '__main__':
+    # 檢查 Note.order 欄位是否存在，若不存在則新增（SQLite only）
+    with app.app_context():
+        from sqlalchemy import inspect, text
+        conn = db.engine.connect()
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('note')]
+        if 'order' not in columns:
+            conn.execute(text('ALTER TABLE note ADD COLUMN "order" INTEGER DEFAULT 0'))
+        conn.close()
     app.run(host='0.0.0.0', port=5001, debug=True)
