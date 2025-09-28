@@ -241,7 +241,24 @@
             background: #c82333;
             transform: translateY(-1px);
         }
+        .btn-translate {
+            background: #f1cfe3;
+            color: white;
+        }
 
+        .btn-translate:hover {
+            background: #f5f1f4;
+            transform: translateY(-1px);
+        }
+        .btn-revert {
+            background: #6c757d;
+            color: white;
+            margin-top: 10px;
+        }
+        .btn-revert:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -388,6 +405,18 @@
                     <div class="editor-actions" id="editorActions" style="display: none;">
                         <button class="btn btn-save" id="saveBtn">💾 Save</button>
                         <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
+                        <select id="targetLangSelect" class="form-input" style="width:auto;min-width:120px;">
+                            <option value="">🌐 Select Language</option>
+                            <option value="zh-tw">繁體中文</option>
+                            <option value="en">English</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
+                            <!-- 可自行擴充 -->
+                        </select>
+                        <button class="btn btn-translate" id="translateBtn">🌐 Translate</button> <!-- 新增 -->
                     </div>
                 </div>
 
@@ -417,6 +446,7 @@
                     <div class="form-group">
                         <label class="form-label" for="noteContent">Content</label>
                         <textarea class="form-textarea" id="noteContent" placeholder="Start writing your note..."></textarea>
+                        <button class="btn btn-revert" id="revertBtn">↩️ Revert</button> <!-- 新增 -->
                     </div>
                 </div>
 
@@ -434,6 +464,7 @@
                 this.notes = [];
                 this.currentNote = null;
                 this.isLoading = false;
+                this.originalContent = null; // 用於儲存原始內容以便還原
                 this.init();
             }
 
@@ -446,8 +477,12 @@
                 document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
+                document.getElementById('translateBtn').addEventListener('click', () => this.translateNote()); // 新增
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
-                
+                document.getElementById('targetLangSelect').addEventListener('change', () => {
+                    this.hideMessage();
+                });
+                document.getElementById('revertBtn').addEventListener('click', () => this.revertContent()); // 新增
                 // Auto-save on content change (debounced)
                 let saveTimeout;
                 const autoSave = () => {
@@ -567,6 +602,7 @@
                 this.currentNote = note;
                 this.showEditor();
                 this.renderNotesList(); // Re-render to update active state
+                this.originalContent = null; // 清除原始內容暫存
                 
                 document.getElementById('noteTitle').value = note.title || '';
                 document.getElementById('noteContent').value = note.content || '';
@@ -577,6 +613,7 @@
             }
 
             createNewNote() {
+                this.originalContent = null;// 清除原始內容暫存
                 this.currentNote = {
                     id: null,
                     title: '',
@@ -618,6 +655,8 @@
             }
 
             async saveNote(isAutoSave = false) {
+                this.originalContent = null;// 清除原始內容暫存
+                
                 if (!this.currentNote) return;
 
                 const title = document.getElementById('noteTitle').value.trim();
@@ -703,6 +742,47 @@
                     this.showMessage('Note deleted successfully!', 'success');
                 } catch (error) {
                     this.showMessage(`Error deleting note: ${error.message}`, 'error');
+                }
+            }
+
+            async translateNote() {
+                const content = document.getElementById('noteContent').value.trim();
+                if (!content) {
+                    this.showMessage('請先輸入要翻譯的內容', 'error');
+                    return;
+                }
+                const targetLang = document.getElementById('targetLangSelect').value;
+                if (!targetLang) {
+                    this.showMessage('請先選擇目標語言', 'error');
+                    document.getElementById('targetLangSelect').focus();
+                    return;
+                }
+                // 暫存原始內容（僅在第一次翻譯時）
+                if (this.originalContent === null) {
+                    this.originalContent = content;
+                }
+                this.showMessage('翻譯中...', 'loading');
+                try {
+                    const response = await fetch(`/api/translate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content, target_lang: targetLang })
+                    });
+                    if (!response.ok) throw new Error('翻譯失敗');
+                    const data = await response.json();
+                    document.getElementById('noteContent').value = data.translated_content;
+                    this.showMessage('翻譯完成！', 'success');
+                } catch (error) {
+                    this.showMessage(`翻譯失敗: ${error.message}`, 'error');
+                }
+            }
+            revertContent() {
+                if (this.originalContent !== null) {
+                    document.getElementById('noteContent').value = this.originalContent;
+                    this.showMessage('已還原為原始內容', 'success');
+                    this.originalContent = null; // 還原後清除暫存
+                } else {
+                    this.showMessage('沒有可還原的內容', 'error');
                 }
             }
 

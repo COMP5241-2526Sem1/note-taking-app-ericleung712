@@ -9,6 +9,7 @@ def get_notes():
     """Get all notes, ordered by order then updated_at"""
     notes = Note.query.order_by(Note.order.asc(), Note.updated_at.desc()).all()
     return jsonify([note.to_dict() for note in notes])
+
 # 批次更新筆記順序
 @note_bp.route('/notes/order', methods=['PUT'])
 def update_notes_order():
@@ -90,14 +91,15 @@ def update_note(note_id):
             try:
                 note.event_date = datetime.strptime(data['event_date'], '%Y-%m-%d').date() if data['event_date'] else None
             except ValueError:
-                note.event_date = None
+                pass
 
         # 處理時間
         if 'event_time' in data:
             try:
                 note.event_time = datetime.strptime(data['event_time'], '%H:%M').time() if data['event_time'] else None
             except ValueError:
-                note.event_time = None
+                pass
+        # 若 event_date 或 event_time 沒有在 data 中，則不覆蓋原本的值
 
         db.session.commit()
         return jsonify(note.to_dict())
@@ -115,6 +117,40 @@ def delete_note(note_id):
         return '', 204
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@note_bp.route('/translate', methods=['POST'])
+def translate_content():
+    """Translate arbitrary content to target language (no DB change)"""
+    from src.llm import translate
+    data = request.json
+    content = data.get('content')
+    target_lang = data.get('target_lang')
+    if not content or not target_lang:
+        return jsonify({'error': 'content and target_lang required'}), 400
+    try:
+        translated = translate(content, target_lang)
+        return jsonify({'translated_content': translated}), 200
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@note_bp.route('/notes/<int:note_id>/translate', methods=['POST'])
+def translate_note(note_id):
+    """Translate note content to target language"""
+    from src.llm import translate
+    note = Note.query.get_or_404(note_id)
+    data = request.json
+    target_lang = data.get('target_lang')
+    if not target_lang:
+        return jsonify({'error': 'target_lang required'}), 400
+    try:
+        translated = translate(note.content, target_lang)
+        return jsonify({'translated_content': translated}), 200
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 印出詳細錯誤
         return jsonify({'error': str(e)}), 500
 
 @note_bp.route('/notes/search', methods=['GET'])
