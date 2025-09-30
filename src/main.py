@@ -9,6 +9,7 @@ from src.models.user import db
 from src.routes.user import user_bp
 from src.routes.note import note_bp
 from src.models.note import Note
+from dotenv import load_dotenv
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -25,7 +26,12 @@ DB_PATH = os.path.join(ROOT_DIR, 'database', 'app.db')
 # ensure database directory exists
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
+load_dotenv()
+POSTGRES_URL = os.getenv("supabaseURL")
+POSTGRES_KEY = os.getenv("supabaseKey")
+# Supabase 連線字串格式通常為：postgresql://user:password@host:port/dbname
+# 你可在 Supabase 專案設定中取得完整連線字串
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 with app.app_context():
