@@ -53,6 +53,13 @@ def serve(path):
         else:
             return "index.html not found", 404
 
+@app.route('/')
+def home():
+    return 'Hello from Vercel!'
+
+# 需加下列程式讓 Vercel 正確啟動
+def handler(environ, start_response):
+    return app(environ, start_response)
 
 if __name__ == '__main__':
     # 檢查 Note.order 欄位是否存在，若不存在則新增（SQLite only）
