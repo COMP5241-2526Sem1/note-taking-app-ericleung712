@@ -53,7 +53,7 @@ def serve(path):
         else:
             return "index.html not found", 404
 
-@app.route('/')
+@app.route('/src/')
 def home():
     return 'Hello from Vercel!'
 
