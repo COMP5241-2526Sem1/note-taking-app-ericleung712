@@ -44,7 +44,7 @@ def translate(text, target_language):
 # main function to test the LLM model
 if __name__ == "__main__":
     text = "Hello, how are you?"
-    target_language = "Chinese"
+    target_language = "Japanese"
     translated_text = translate(text, target_language)
     print("Original text:", text)
     print("Target language:", target_language)
