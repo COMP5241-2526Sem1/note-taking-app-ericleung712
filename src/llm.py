@@ -3,6 +3,7 @@ import os
 from openai import OpenAI
 from dotenv import load_dotenv
 from .note_generation_prompt import SYSTEM_PROMPT_TEMPLATE
+from datetime import datetime
 
 load_dotenv()  # Load environment variables from .env
 token = os.environ["GITHUB_TOKEN"]
@@ -37,7 +38,17 @@ def generate_note_from_text(user_input, language="English"):
     Returns:
         dict: Structured note with title, content, tags, event_date, event_time
     """
-    system_prompt_filled = SYSTEM_PROMPT_TEMPLATE.format(language=language)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    system_prompt_filled = SYSTEM_PROMPT_TEMPLATE.format(
+        language=language,
+        today=today_str        
+    )
+    # 在 prompt template 裡加一行：Today is {today}
+    # 例如：
+    # ... (prompt內容)
+    # Today is {today}
+    # ... (prompt內容)
+    
     messages = [
         {"role": "system", "content": system_prompt_filled},
         {"role": "user", "content": f"{user_input}"}

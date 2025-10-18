@@ -11,7 +11,7 @@ Extract the user's input into the following structured JSON fields:
 1. **title**: A concise title of the notes (maximum 7 words)
 2. **content**: The notes content based on user input, written in full sentences and proper grammar
 3. **tags**: A comma-separated string of at most 3 keywords or tags that categorize the content
-4. **event_date**: Date in YYYY-MM-DD format. For "today", "tomorrow", etc., calculate from current date. Leave blank if not specified
+4. **event_date**: Date in YYYY-MM-DD format. For "today", "tomorrow", etc., calculate from Today is {today}. Leave blank if not specified
 5. **event_time**: Time in HH:MM format (24-hour). Leave blank if not specified
 
 **Important Instructions:**
