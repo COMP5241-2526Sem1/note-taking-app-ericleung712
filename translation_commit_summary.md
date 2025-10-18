@@ -85,6 +85,98 @@ createNewNote() {
 ```
 **原因：** 切換筆記或新建時，確保暫存內容不會殘留。
 
+**5. Extend the translation coverage to title in translateNote()**
+```javascript
+                const noteId = this.currentNote && this.currentNote.id;
+                const title = document.getElementById('noteTitle').value.trim();
+
+                const targetLang = document.getElementById('targetLangSelect').value;
+                if (!title && !content) {
+                    this.showMessage('請先輸入標題或內容', 'error');
+                    return;
+                }
+
+                if (this.originalTitle === null) {
+                    this.originalTitle = title;
+                }
+
+                try {
+                    let response;
+                    if (noteId) {
+                        response = await fetch(`/api/notes/${noteId}/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target_lang: targetLang })
+                        });
+                    } else {
+                        response = await fetch(`/api/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title, content, target_lang: targetLang })
+                        });
+                    }
+                }
+                    const data = await response.json();
+                    if (data.translated_title !== undefined && data.translated_title !== null) {
+                        document.getElementById('noteTitle').value = data.translated_title;
+                    }
+                    if (data.translated_content !== undefined && data.translated_content !== null) {
+                        document.getElementById('noteContent').value = data.translated_content;
+                    }
+```
+**原因：** More convenient 。
+
+**6. Insert generate note function with the aid of AI chatbot**
+```Javascript
+document.getElementById('generateNoteBtn').addEventListener('click', function() {
+            const area = document.getElementById('generateNoteArea');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+            document.getElementById('generateNoteResult').innerHTML = '';
+            document.getElementById('generateNoteInput').value = '';
+        });
+        
+        document.getElementById('generateNoteSubmit').addEventListener('click', async function() {
+            const input = document.getElementById('generateNoteInput').value.trim();
+            const resultDiv = document.getElementById('generateNoteResult');
+            if (!input) {
+                resultDiv.innerHTML = '<span style="color:#d9534f;">請輸入描述</span>';
+                return;
+            }
+            resultDiv.innerHTML = 'AI 產生中...';
+            try {
+                const res = await fetch('/api/notes/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: input })
+                });
+                if (!res.ok) throw new Error('AI 產生失敗');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                const note = data.note;
+                resultDiv.innerHTML = `
+                    <div style="background:#f8f9fa;padding:10px;border-radius:8px;">
+                        <b>標題：</b>${note.title || ''}<br>
+                        <b>內容：</b><pre style="white-space:pre-wrap;">${note.content || ''}</pre>
+                        <b>標籤：</b>${note.tags || ''}<br>
+                        <b>日期：</b>${note.event_date || ''} <b>時間：</b>${note.event_time || ''}
+                    </div>
+                    <button id="fillToEditorBtn" style="margin-top:8px;background:#28a745;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">一鍵填入編輯器</button>
+                `;
+                document.getElementById('fillToEditorBtn').onclick = function() {
+                    // 將 AI 產生內容填入編輯器
+                    noteTaker.createNewNote();
+                    document.getElementById('noteTitle').value = note.title || '';
+                    document.getElementById('noteContent').value = note.content || '';
+                    document.getElementById('noteTags').value = note.tags || '';
+                    document.getElementById('noteEventDate').value = note.event_date || '';
+                    document.getElementById('noteEventTime').value = note.event_time || '';
+                    document.getElementById('editorTitle').textContent = note.title || 'New Note';
+                };
+            } catch (e) {
+                resultDiv.innerHTML = `<span style="color:#d9534f;">${e.message}</span>`;
+            }
+        });
+
 ### 後端 (routes/note.py)
 
 **1. 新增 /api/translate API**
@@ -94,22 +186,45 @@ def translate_content():
     """Translate arbitrary content to target language (no DB change)"""
     from src.llm import translate
     data = request.json
+    title = data.get('title')
     content = data.get('content')
     target_lang = data.get('target_lang')
-    if not content or not target_lang:
-        return jsonify({'error': 'content and target_lang required'}), 400
+    if (not title and not content) or not target_lang:
+        return jsonify({'error': 'title or content and target_lang required'}), 400
     try:
-        translated = translate(content, target_lang)
-        return jsonify({'translated_content': translated}), 200
+        translated_title = translate(title, target_lang) if title else ''
+        translated_content = translate(content, target_lang) if content else ''
+        return jsonify({
+            'translated_title': translated_title,
+            'translated_content': translated_content
+        }), 200
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
-```
-**原因：** 讓前端可翻譯任意內容，不需 note_id，且不會改變資料庫。
 
-**2. 其他 API 調整**
-（如 `/notes/<note_id>/translate` 仍保留，支援已儲存筆記的翻譯）
+@note_bp.route('/notes/<int:note_id>/translate', methods=['POST'])
+def translate_note(note_id):
+    """Translate note content to target language"""
+    from src.llm import translate
+    note = Note.query.get_or_404(note_id)
+    data = request.json
+    target_lang = data.get('target_lang')
+    if not target_lang:
+        return jsonify({'error': 'target_lang required'}), 400
+    try:
+        translated_title = translate(note.title, target_lang)
+        translated_content = translate(note.content, target_lang)
+        return jsonify({
+            'translated_title': translated_title,
+            'translated_content': translated_content
+        }), 200
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 印出詳細錯誤
+        return jsonify({'error': str(e)}), 500
+```
+**原因：** 讓前端可翻譯標題和內容，不需 note_id，且不會改變資料庫。
 
 ### llm.py
 
@@ -119,6 +234,7 @@ def translate(text, target_language):
     # ...呼叫 LLM API 並回傳翻譯內容...
 ```
 **原因：** 封裝 LLM 翻譯邏輯，供 API 呼叫。
+
 
 ## 2. 步驟與說明
 1. **設計前端 UI**：在編輯器區塊新增語言選擇與翻譯、還原按鈕。
