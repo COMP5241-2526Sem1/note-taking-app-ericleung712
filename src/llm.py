@@ -2,6 +2,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+from .note_generation_prompt import SYSTEM_PROMPT_TEMPLATE
 
 load_dotenv()  # Load environment variables from .env
 token = os.environ["GITHUB_TOKEN"]
@@ -23,6 +24,37 @@ def call_llm_model(model, messages, temperature=1.0, top_p=1.0): # default value
     )
 
     return response.choices[0].message.content
+
+# A function to generate structured notes from text using the LLM model
+def generate_note_from_text(user_input, language="English"):
+    """
+    Generate structured note from user input text.
+    
+    Args:
+        user_input (str): The user's unstructured note description
+        language (str): Target language for title and content (default: "English")
+    
+    Returns:
+        dict: Structured note with title, content, tags, event_date, event_time
+    """
+    system_prompt_filled = SYSTEM_PROMPT_TEMPLATE.format(language=language)
+    messages = [
+        {"role": "system", "content": system_prompt_filled},
+        {"role": "user", "content": f"{user_input}"}
+    ]
+    import json
+    raw = call_llm_model(model, messages)
+    try:
+        note = json.loads(raw)
+    except Exception:
+        # 若 LLM 回傳非純 JSON,嘗試只取第一個 {...}
+        import re
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if match:
+            note = json.loads(match.group(0))
+        else:
+            raise ValueError("LLM did not return valid JSON")
+    return note
 
 # A function to translate to text using the LLM model
 def translate(text, target_language):

@@ -66,6 +66,23 @@ def create_note():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@note_bp.route('/notes/generate', methods=['POST'])
+def generate_note():
+    """根據雜亂描述產生結構化筆記內容（不寫入 DB），支援多語言輸出"""
+    from src.llm import generate_note_from_text
+    data = request.json
+    user_input = data.get('content')
+    language = data.get('language', 'English')  # 預設為英文
+    if not user_input:
+        return jsonify({'error': 'content required'}), 400
+    try:
+        note = generate_note_from_text(user_input, language)
+        return jsonify({'note': note}), 200
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 @note_bp.route('/notes/<int:note_id>', methods=['GET'])
 def get_note(note_id):
     """Get a specific note by ID"""
@@ -124,13 +141,18 @@ def translate_content():
     """Translate arbitrary content to target language (no DB change)"""
     from src.llm import translate
     data = request.json
+    title = data.get('title')
     content = data.get('content')
     target_lang = data.get('target_lang')
-    if not content or not target_lang:
-        return jsonify({'error': 'content and target_lang required'}), 400
+    if (not title and not content) or not target_lang:
+        return jsonify({'error': 'title or content and target_lang required'}), 400
     try:
-        translated = translate(content, target_lang)
-        return jsonify({'translated_content': translated}), 200
+        translated_title = translate(title, target_lang) if title else ''
+        translated_content = translate(content, target_lang) if content else ''
+        return jsonify({
+            'translated_title': translated_title,
+            'translated_content': translated_content
+        }), 200
     except Exception as e:
         import traceback
         print(traceback.format_exc())
@@ -146,8 +168,12 @@ def translate_note(note_id):
     if not target_lang:
         return jsonify({'error': 'target_lang required'}), 400
     try:
-        translated = translate(note.content, target_lang)
-        return jsonify({'translated_content': translated}), 200
+        translated_title = translate(note.title, target_lang)
+        translated_content = translate(note.content, target_lang)
+        return jsonify({
+            'translated_title': translated_title,
+            'translated_content': translated_content
+        }), 200
     except Exception as e:
         import traceback
         print(traceback.format_exc())  # 印出詳細錯誤

@@ -105,6 +105,20 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
+        .generate-note-btn {
+            width: 100%;
+            padding: 12px;
+            background: #ffb347;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
         .notes-list {
             max-height: 500px;
             overflow-y: auto;
@@ -187,6 +201,7 @@
         }
         .event-date {
             display: inline-block;
+            max-width: max-content;
             padding: 2px 8px;
             background-color: #e8f5e9;
             color: #28a745;
@@ -393,7 +408,25 @@
             <div class="sidebar">
                 <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search notes...">
                 <button class="new-note-btn" id="newNoteBtn">✨ New Note</button>
-                
+                <button class="generate-note-btn" id="generateNoteBtn">🤖 Generate Notes</button>
+                <div id="generateNoteArea" style="display:none;margin-bottom:8px;background:#fffbe6;border-radius:10px;padding:16px;box-shadow:0 2px 8px rgba(255,179,71,0.1);">
+                    <div style="margin-bottom:10px;">
+                        <label for="generateNoteLang" style="font-weight:600;">Output Language:</label>
+                        <select id="generateNoteLang" style="margin-left:8px;padding:6px 12px;border-radius:8px;">
+                            <option value="English">English</option>
+                            <option value="繁體中文">繁體中文</option>
+                            <option value="日本語">日本語</option>
+                            <option value="한국어">한국어</option>
+                            <option value="Français">Français</option>
+                            <option value="Deutsch">Deutsch</option>
+                            <option value="Español">Español</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:16px;">Please tell me your event description:</div>
+                    <textarea id="generateNoteInput" style="width:100%;min-height:60px;border-radius:8px;padding:8px;border:1.5px solid #ffd580;"></textarea>
+                    <button id="generateNoteSubmit" style="margin-top:16px;background:#ffb347;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;">Generate</button>
+                    <div id="generateNoteResult" style="margin-top:12px;"></div>
+                </div>
                 <div class="notes-list" id="notesList">
                     <div class="loading">Loading notes...</div>
                 </div>
@@ -464,7 +497,8 @@
                 this.notes = [];
                 this.currentNote = null;
                 this.isLoading = false;
-                this.originalContent = null; // 用於儲存原始內容以便還原
+                this.originalContent = null;
+                this.originalTitle = null; // 用於儲存原始標題以便還原
                 this.init();
             }
 
@@ -746,43 +780,61 @@
             }
 
             async translateNote() {
+                const noteId = this.currentNote && this.currentNote.id;
+                const title = document.getElementById('noteTitle').value.trim();
                 const content = document.getElementById('noteContent').value.trim();
-                if (!content) {
-                    this.showMessage('請先輸入要翻譯的內容', 'error');
+                const targetLang = document.getElementById('targetLangSelect').value;
+                if (!title && !content) {
+                    this.showMessage('Please input title or content', 'error');
                     return;
                 }
-                const targetLang = document.getElementById('targetLangSelect').value;
                 if (!targetLang) {
-                    this.showMessage('請先選擇目標語言', 'error');
+                    this.showMessage('Please select a target language', 'error');
                     document.getElementById('targetLangSelect').focus();
                     return;
                 }
-                // 暫存原始內容（僅在第一次翻譯時）
+                if (this.originalTitle === null) {
+                    this.originalTitle = title;
+                }
                 if (this.originalContent === null) {
                     this.originalContent = content;
                 }
-                this.showMessage('翻譯中...', 'loading');
+                this.showMessage('Translating...', 'loading');
                 try {
-                    const response = await fetch(`/api/translate`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content, target_lang: targetLang })
-                    });
-                    if (!response.ok) throw new Error('翻譯失敗');
+                    let response;
+                    if (noteId) {
+                        response = await fetch(`/api/notes/${noteId}/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target_lang: targetLang })
+                        });
+                    } else {
+                        response = await fetch(`/api/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title, content, target_lang: targetLang })
+                        });
+                    }
+                    if (!response.ok) throw new Error('Translation failed');
                     const data = await response.json();
-                    document.getElementById('noteContent').value = data.translated_content;
-                    this.showMessage('翻譯完成！', 'success');
+                    if (data.translated_title !== undefined && data.translated_title !== null) {
+                        document.getElementById('noteTitle').value = data.translated_title;
+                    }
+                    if (data.translated_content !== undefined && data.translated_content !== null) {
+                        document.getElementById('noteContent').value = data.translated_content;
+                    }
+                    this.showMessage('Translation completed!', 'success');
                 } catch (error) {
-                    this.showMessage(`翻譯失敗: ${error.message}`, 'error');
+                    this.showMessage(`Translation failed: ${error.message}`, 'error');
                 }
             }
             revertContent() {
                 if (this.originalContent !== null) {
                     document.getElementById('noteContent').value = this.originalContent;
-                    this.showMessage('已還原為原始內容', 'success');
-                    this.originalContent = null; // 還原後清除暫存
+                    this.showMessage('Reverted to original content', 'success');
+                    this.originalContent = null; // Clear temporary storage after reverting
                 } else {
-                    this.showMessage('沒有可還原的內容', 'error');
+                    this.showMessage('No content to revert', 'error');
                 }
             }
 
@@ -875,6 +927,63 @@
                 }
             }
         }
+
+                // 產生筆記功能
+        document.getElementById('generateNoteBtn').addEventListener('click', function() {
+            const area = document.getElementById('generateNoteArea');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+            document.getElementById('generateNoteResult').innerHTML = '';
+            document.getElementById('generateNoteInput').value = '';
+        });
+        
+        document.getElementById('generateNoteSubmit').addEventListener('click', async function() {
+            const input = document.getElementById('generateNoteInput').value.trim();
+            const language = document.getElementById('generateNoteLang').value;
+            const resultDiv = document.getElementById('generateNoteResult');
+            if (!input) {
+                resultDiv.innerHTML = '<span style="color:#d9534f;">Please enter a description</span>';
+                return;
+            }
+            resultDiv.innerHTML = 'AI is generating...';
+            try {
+                const res = await fetch('/api/notes/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: input, language: language })
+                });
+                if (!res.ok) throw new Error('AI generation failed');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                const note = data.note;
+                resultDiv.innerHTML = `
+                    <div class="note-item" style="margin-bottom:8px; box-shadow:0 2px 8px rgba(102,126,234,0.08);">
+                        <div class="note-header">
+                            <div class="note-title">${note.title || 'Untitled'}</div>                           
+                        </div>
+                        <div class="note-preview" style="margin-bottom:8px;">${note.content || ''}</div>
+                        <div class="note-footer">
+                            ${note.tags ? `<div class="note-tags">${note.tags.split(',').map(tag => `<span class='tag'>#${tag.trim()}</span>`).join(' ')}</div>` : ''}
+                        </div>
+                        <div class="event-date">📅${note.event_date || ''}${note.event_time ? ` ⏰ ${note.event_time}` : ''}</div>
+                    </div>
+                    <button id="savetoEditorBtn" style="margin-top:8px;background:#28a745;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;">Save</button>
+                `;
+                document.getElementById('savetoEditorBtn').onclick = function() {
+                    // 將 AI 產生內容填入編輯器並直接儲存
+                    noteTaker.createNewNote();
+                    document.getElementById('noteTitle').value = note.title || '';
+                    document.getElementById('noteContent').value = note.content || '';
+                    document.getElementById('noteTags').value = note.tags || '';
+                    document.getElementById('noteEventDate').value = note.event_date || '';
+                    document.getElementById('noteEventTime').value = note.event_time || '';
+                    document.getElementById('editorTitle').textContent = note.title || 'New Note';
+                    // 自動儲存
+                    noteTaker.saveNote();
+                };
+            } catch (e) {
+                resultDiv.innerHTML = `<span style="color:#d9534f;">${e.message}</span>`;
+            }
+        });
 
         // Initialize the app
         const noteTaker = new NoteTaker();
