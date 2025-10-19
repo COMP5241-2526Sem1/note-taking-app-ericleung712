@@ -188,6 +188,7 @@ The application is configured for easy deployment with:
 - Chrome/Chromium (recommended)
 - Firefox
 - Safari
+
 ## 🎨 User Interface Features
 
 ### Sidebar
@@ -215,8 +216,6 @@ The application is configured for easy deployment with:
 - **Modern Typography**: Clean and readable
 3. Ensure all dependencies are installed
 4. Check network connectivity for the deployed version
-
-## 🎯 Future Enhancements
 
 ## 🎯 Future Enhancements
 
