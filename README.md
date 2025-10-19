@@ -16,7 +16,7 @@ A modern, responsive web application for managing personal notes with a beautifu
 
 ## 🚀 Live Demo
 
-The application is deployed and accessible at: **https://3dhkilc88dkk.manus.space**
+The application is deployed and accessible at: **https://note-taking-app-ericleung712.vercel.app**
 
 ## 🛠 Technology Stack
 
@@ -31,28 +31,34 @@ The application is deployed and accessible at: **https://3dhkilc88dkk.manus.spac
 - **Flask-CORS**: Cross-origin resource sharing support
 
 ### Database
-- **SQLite**: Lightweight, file-based database for data persistence
+- **PostgreSQL**: Lightweight, file-based database for data persistence
 
 ## 📁 Project Structure
 
 ```
-notetaking-app/
+note-taking-app-ericleung712/
 ├── src/
 │   ├── models/
-│   │   ├── user.py          # User model (template)
-│   │   └── note.py          # Note model with database schema
+│   │   ├── user.py          # User model
+│   │   └── note.py          # Note model with DB schema
 │   ├── routes/
-│   │   ├── user.py          # User API routes (template)
-│   │   └── note.py          # Note API endpoints
+│   │   ├── user.py          # User API endpoints
+│   │   └── note.py          # Note API endpoints (CRUD, search, AI, translation)
 │   ├── static/
-│   │   ├── index.html       # Frontend application
-│   │   └── favicon.ico      # Application icon
-│   ├── database/
-│   │   └── app.db           # SQLite database file
+│   │   └── index.html       # Frontend UI (pure HTML/CSS/JS)
+│   ├── llm.py               # AI note generation/translation (OpenAI, prompt)
+│   ├── note_generation_prompt.py # Prompt template for AI note generation
 │   └── main.py              # Flask application entry point
-├── venv/                    # Python virtual environment
 ├── requirements.txt         # Python dependencies
-└── README.md               # This file
+├── README.md                # This documentation
+├── AI_generate_note.md      # AI note generation instructions
+├── Deployment_on_Vercel.md  # Vercel deployment guide
+├── deploy_vercel.sh         # Vercel deployment script
+├── test_api.http            # API test file
+├── test_note_generation.py  # AI note generation test
+├── token.txt                # Token file (secret)
+├── translation_commit_summary.md # Translation commit summary
+├── vercel.json              # Vercel config
 ```
 
 ## 🔧 Local Development Setup
@@ -91,21 +97,31 @@ notetaking-app/
 ## 📡 API Endpoints
 
 ### Notes API
-- `GET /api/notes` - Get all notes
-- `POST /api/notes` - Create a new note
-- `GET /api/notes/<id>` - Get a specific note
-- `PUT /api/notes/<id>` - Update a note
-- `DELETE /api/notes/<id>` - Delete a note
-- `GET /api/notes/search?q=<query>` - Search notes
+
+- `GET /notes` - Get all notes
+- `POST /notes` - Create a new note
+- `GET /notes/<id>` - Get a specific note
+- `PUT /notes/<id>` - Update a note
+- `DELETE /notes/<id>` - Delete a note
+- `PUT /notes/order` - Batch update note order
+- `POST /notes/generate` - AI generate structured note (not saved to DB)
+- `POST /notes/<id>/translate` - Translate a specific note
+- `POST /translate` - Translate arbitrary content (not saved to DB)
+- `GET /notes/search?q=<query>` - Search notes (title/content)
 
 ### Request/Response Format
+### Note Data Format
 ```json
 {
-  "id": 1,
-  "title": "My Note Title",
-  "content": "Note content here...",
-  "created_at": "2025-09-03T11:26:38.123456",
-  "updated_at": "2025-09-03T11:27:30.654321"
+   "id": 1,
+   "title": "My Note Title",
+   "content": "Note content here...",
+   "tags": ["tag1", "tag2"],
+   "event_date": "2025-10-19",
+   "event_time": "17:00",
+   "order": 0,
+   "created_at": "2025-10-19T11:26:38.123456",
+   "updated_at": "2025-10-19T11:27:30.654321"
 }
 ```
 
@@ -136,11 +152,15 @@ notetaking-app/
 ### Notes Table
 ```sql
 CREATE TABLE note (
-    id INTEGER PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+   id INTEGER PRIMARY KEY,
+   title VARCHAR(200) NOT NULL,
+   content TEXT NOT NULL,
+   tags VARCHAR(500),
+   event_date DATE,
+   event_time TIME,
+   order INTEGER DEFAULT 0,
+   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -168,42 +188,49 @@ The application is configured for easy deployment with:
 - Chrome/Chromium (recommended)
 - Firefox
 - Safari
-- Edge
-- Mobile browsers (iOS Safari, Chrome Mobile)
+## 🎨 User Interface Features
 
-## 🤝 Contributing
+### Sidebar
+- **Search Box**: Real-time search through note titles and content
+- **New Note Button**: Quickly create new notes
+- **Notes List**: Scrollable, preview title/content/date
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Editor Panel
+- **Title Input**: Edit note title
+- **Content Editor**: Rich text editing area
+- **Save Button**: Manual save (auto-save also available)
+- **Delete Button**: Delete note (with confirmation)
+- **Real-time Updates**: Changes reflected immediately
 
-## 📄 License
+### Other Features
+- **AI Structured Note Generation**: Input messy description, AI generates title/content/tags/date/time
+- **Multilingual Translation**: Translate arbitrary content or notes
+- **Batch Sorting**: Drag or specify order
 
-This project is open source and available under the MIT License.
-
-## 🆘 Support
-
-For issues or questions:
-1. Check the browser console for error messages
-2. Verify the Flask server is running
+### Design Elements
+- **Gradient Background**: Beautiful purple gradient
+- **Glassmorphism**: Semi-transparent panels, blur effect
+- **Animation Effects**: Hover, transitions
+- **Responsive Design**: Works on desktop/mobile
+- **Modern Typography**: Clean and readable
 3. Ensure all dependencies are installed
 4. Check network connectivity for the deployed version
 
 ## 🎯 Future Enhancements
 
+## 🎯 Future Enhancements
+
 Potential improvements for future versions:
 - User authentication and multi-user support
-- Note categories and tags
+- Note categories and advanced tags
 - Rich text formatting (bold, italic, lists)
 - File attachments
 - Export functionality (PDF, Markdown)
 - Dark/light theme toggle
-- Offline support with service workers
+- Offline support (Service Worker)
 - Note sharing capabilities
 
 ---
 
-**Built with ❤️ using Flask, SQLite, and modern web technologies**
+**Built with ❤️ using Flask, PostgreSQL, OpenAI, and modern web technologies**
 
